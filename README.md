@@ -32,7 +32,7 @@ delay-after-teleport-ticks: 20
 
 ## 🚀 Installation
 1. Ensure [CMI](https://www.spigotmc.org/resources/cmi-298-commands-insane-kits-portals-essentials-economy-mysql-sqlite-much-more.3742/) is installed and running on your server.
-2. Place the `FirstJoinRTP-1.2.jar` into your server's `plugins` folder.
+2. Place the `FirstJoinRTP.jar` into your server's `plugins` folder.
 3. Restart your server.
 4. Adjust `plugins/FirstJoinRTP/config.yml` as needed.
 5. Use `/cmi reload` or restart your server if modifying the CMI aspects.
