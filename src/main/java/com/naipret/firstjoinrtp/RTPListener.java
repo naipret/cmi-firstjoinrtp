@@ -18,7 +18,6 @@ import org.bukkit.scheduler.BukkitTask;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Listens for events to manage the first-join RTP process for new players.
@@ -28,9 +27,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RTPListener implements Listener {
 
     private final FirstJoinRTP plugin;
-
-    // Maps player UUIDs to their active monitoring tasks
-    private final ConcurrentHashMap<UUID, BukkitTask> activeMonitoringTasks = new ConcurrentHashMap<>();
 
     // Players who have entered the target world and triggered the RTP, but haven't finished teleporting yet
     private final Set<UUID> inRtpProcess = new HashSet<>();
@@ -58,18 +54,33 @@ public class RTPListener implements Listener {
 
     /**
      * Checks when a player joins the server.
-     * If they haven't completed RTP before, it starts tracking their location.
+     * If they join directly into the target world, start RTP.
+     * If they join a Limbo/Lobby world, we wait for PlayerChangedWorldEvent.
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        
+        if (hasCompletedRTP(player)) return;
 
-        // If they already completed the RTP process, ignore them.
-        if (hasCompletedRTP(player)) {
-            return;
+        // If they bypass Limbo and spawn directly into the target world
+        if (player.getWorld().getName().equalsIgnoreCase(targetWorld)) {
+            prepareRTP(player);
         }
+    }
 
-        startMonitoring(player);
+    /**
+     * Listens for players moving between worlds (e.g., leaving a Login Limbo).
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerChangeWorld(org.bukkit.event.player.PlayerChangedWorldEvent event) {
+        Player player = event.getPlayer();
+        
+        if (hasCompletedRTP(player)) return;
+
+        if (player.getWorld().getName().equalsIgnoreCase(targetWorld)) {
+            prepareRTP(player);
+        }
     }
 
     /**
@@ -93,59 +104,56 @@ public class RTPListener implements Listener {
     }
 
     /**
-     * Starts a BukkitTask that periodically checks if the player has entered the target world.
-     * Required for setups with Login Limbo phases (AuthMe, LibreLogin, etc).
-     *
-     * @param player The player being tracked
+     * Prepares the player for RTP: hides them, makes them invulnerable, 
+     * executes the command, and starts a timeout safeguard.
+     * 
+     * @param player The player to prepare
      */
-    private void startMonitoring(Player player) {
+    private void prepareRTP(Player player) {
         UUID uuid = player.getUniqueId();
+        
+        // Prevent double execution
+        if (inRtpProcess.contains(uuid)) return;
 
-        // Prevent registering multiple tracking tasks for the same player.
-        if (activeMonitoringTasks.containsKey(uuid)) return;
-
-        BukkitTask task = new BukkitRunnable() {
+        plugin.getLogger().info("Player " + player.getName() + " entered " + targetWorld + ". Hiding and preparing RTP...");
+        
+        inRtpProcess.add(uuid);
+        
+        for (Player other : Bukkit.getOnlinePlayers()) {
+            other.hidePlayer(plugin, player);
+        }
+        
+        String cmd = rtpCommand.replace("%player%", player.getName())
+                               .replace("%world%", targetWorld);
+        
+        // Small delay to guarantee they are fully inserted in the world before executing RTP
+        new BukkitRunnable() {
             @Override
             public void run() {
-                Player p = Bukkit.getPlayer(uuid);
-
-                // Cancel task if the player goes offline unexpectedly
-                if (p == null || !p.isOnline()) {
-                    cancelTask(uuid);
-                    return;
-                }
-
-                // If the player successfully enters the target world (e.g., leaves a login Limbo)
-                if (p.getWorld().getName().equalsIgnoreCase(targetWorld)) {
-                    cancelTask(uuid);
-
-                    plugin.getLogger().info("Player " + p.getName() + " entered " + targetWorld + ". Hiding and preparing RTP...");
-
-                    // Mark player as going through the RTP process
-                    inRtpProcess.add(uuid);
-
-                    // Hide the player from others so it doesn't look glitchy while they are being teleported
-                    for (Player other : Bukkit.getOnlinePlayers()) {
-                        other.hidePlayer(plugin, p);
-                    }
-
-                    // Format and dispatch the RTP command
-                    String cmd = rtpCommand.replace("%player%", p.getName())
-                                           .replace("%world%", targetWorld);
-
-                    new BukkitRunnable() {
-                        @Override
-                        public void run() {
-                            if (p.isOnline()) {
-                                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), cmd);
-                            }
-                        }
-                    }.runTaskLater(plugin, 10L); // Small delay to guarantee they are fully inserted in the world before RTP
+                if (player.isOnline()) {
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), cmd);
                 }
             }
-        }.runTaskTimer(plugin, 20L, 20L); // Check every second (20 ticks)
+        }.runTaskLater(plugin, 10L); 
 
-        activeMonitoringTasks.put(uuid, task);
+        // TIMEOUT SAFEGUARD: 15 seconds (300 ticks)
+        // If CMI RTP fails, they would otherwise be stuck invisible and invulnerable forever.
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                // If the player is still in the set after 15s, the teleport event never caught a successful RTP.
+                if (inRtpProcess.contains(uuid)) {
+                    inRtpProcess.remove(uuid);
+                    plugin.getLogger().warning("TIMEOUT: RTP for " + player.getName() + " took too long or failed! Reverting visibility.");
+                    
+                    if (player.isOnline()) {
+                        for (Player other : Bukkit.getOnlinePlayers()) {
+                            other.showPlayer(plugin, player);
+                        }
+                    }
+                }
+            }
+        }.runTaskLater(plugin, 300L);
     }
 
     /**
@@ -162,10 +170,12 @@ public class RTPListener implements Listener {
                 return;
             }
 
-            // We assume teleport causes like COMMAND, PLUGIN, or UNKNOWN might be the RTP execution
-            if (event.getCause() == PlayerTeleportEvent.TeleportCause.COMMAND ||
+            // We assume teleport causes like COMMAND, PLUGIN, or UNKNOWN might be the RTP execution.
+            // Explicitly ensure the destination world matches the target world to avoid false positives (e.g. anti-cheat snapbacks).
+            if (event.getTo().getWorld().getName().equalsIgnoreCase(targetWorld) && 
+               (event.getCause() == PlayerTeleportEvent.TeleportCause.COMMAND ||
                 event.getCause() == PlayerTeleportEvent.TeleportCause.PLUGIN ||
-                event.getCause() == PlayerTeleportEvent.TeleportCause.UNKNOWN) {
+                event.getCause() == PlayerTeleportEvent.TeleportCause.UNKNOWN)) {
 
                 Location newLoc = event.getTo();
 
@@ -241,30 +251,13 @@ public class RTPListener implements Listener {
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         UUID uuid = event.getPlayer().getUniqueId();
-        cancelTask(uuid);
         inRtpProcess.remove(uuid);
-    }
-
-    /**
-     * Internal method to safely cancel and eliminate a monitoring task.
-     *
-     * @param uuid The unique ID of the player being monitored
-     */
-    private void cancelTask(UUID uuid) {
-        BukkitTask task = activeMonitoringTasks.remove(uuid);
-        if (task != null) {
-            task.cancel();
-        }
     }
 
     /**
      * Cleans up all running tasks and clears collections. Safe to call on plugin disable.
      */
     public void cleanup() {
-        for (BukkitTask task : activeMonitoringTasks.values()) {
-            task.cancel();
-        }
-        activeMonitoringTasks.clear();
         inRtpProcess.clear();
     }
 }

@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.naipret</groupId>
     <artifactId>FirstJoinRTP</artifactId>
-    <version>1.2</version>
+    <version>1.3</version>
     <name>FirstJoinRTP</name>
     <description>First Join RTP plugin for Minecraft 1.21</description>
     <properties>
