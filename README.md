@@ -36,3 +36,13 @@ delay-after-teleport-ticks: 20
 3. Restart your server.
 4. Adjust `plugins/FirstJoinRTP/config.yml` as needed.
 5. Use `/cmi reload` or restart your server if modifying the CMI aspects.
+
+## 🛠️ Building the Plugin
+
+To compile and package the plugin from source, you will need:
+- **Java Development Kit (JDK) 21** or higher.
+- **Apache Maven** installed and configured in your system path.
+- Run the following command:
+   ```cmd
+   mvn clean package
+   ```
