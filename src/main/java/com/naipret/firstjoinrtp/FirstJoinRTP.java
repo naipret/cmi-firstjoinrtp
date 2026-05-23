@@ -4,9 +4,8 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
- * Main class for the FirstJoinRTP plugin.
- * A lightweight CMI addon that safely teleports new players to a random location
- * upon their first join into a specific world, and saves it as their home.
+ * Main class for the FirstJoinRTP plugin. A lightweight plugin that safely teleports new players to
+ * a random location upon their first join into a specific world, and saves it as their spawnpoint.
  */
 public class FirstJoinRTP extends JavaPlugin {
 
@@ -38,8 +37,8 @@ public class FirstJoinRTP extends JavaPlugin {
     }
 
     /**
-     * Gets the NamespacedKey used to store the RTP completion status
-     * in the player's PersistentDataContainer.
+     * Gets the NamespacedKey used to store the RTP completion status in the player's
+     * PersistentDataContainer.
      *
      * @return The NamespacedKey for "rtp_completed"
      */

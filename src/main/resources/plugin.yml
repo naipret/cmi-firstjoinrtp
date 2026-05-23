@@ -1,6 +1,5 @@
 name: FirstJoinRTP
-version: '${project.version}'
+version: "${project.version}"
 main: com.naipret.firstjoinrtp.FirstJoinRTP
-api-version: '1.21'
-softdepend: [CMI]
+api-version: "1.21"
 description: Teleport new players to a random location when they first join and finish logging in.
