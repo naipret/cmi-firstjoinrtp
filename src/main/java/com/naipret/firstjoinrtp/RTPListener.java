@@ -50,7 +50,7 @@ public class RTPListener implements Listener {
         this.plugin = plugin;
         this.targetWorld = plugin.getConfig().getString("target-world", "world");
         this.rtpCommand = plugin.getConfig().getString("rtp-command",
-                "execute in %world% run spreadplayers 0 0 150 10000 false %player%");
+                "spreadplayers 0 0 150 10000 false %player%");
         this.saveSpawnpoint = plugin.getConfig().getBoolean("save-spawnpoint", true);
         this.delayAfterTp = plugin.getConfig().getLong("delay-after-teleport-ticks", 20L);
     }

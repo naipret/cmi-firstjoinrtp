@@ -10,7 +10,7 @@ target-world: "world"
 #
 # Recommendation: For optimal performance, use a dedicated RTP plugin such as BetterRTP:
 # rtp-command: "rtp player %player% world %world%"
-rtp-command: "execute in %world% run spreadplayers 0 0 150 10000 false %player%"
+rtp-command: "spreadplayers 0 0 150 10000 false %player%"
 
 # Whether to automatically save the player's RTP landing location as their spawnpoint
 # using the Minecraft /spawnpoint system (forced, so they don't need a bed to respawn there).
