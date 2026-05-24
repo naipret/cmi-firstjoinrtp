@@ -1,20 +1,28 @@
 # Target world to check for first join RTP
 target-world: "world"
 
+# Whether to enable the custom Random Teleport command execution
+rtp-command-enabled: true
+
 # Command to execute for Random Teleport
 # Used when the player enters the target world for the first time.
 #
-# Default: Uses vanilla /spreadplayers command.
-# WARNING: Vanilla /spreadplayers runs synchronously on the main thread and can cause
-# TPS drops/lag spikes on production servers if the spread radius is large.
+# Placeholders: %player%, %world%
 #
-# Recommendation: For optimal performance, use a dedicated RTP plugin such as BetterRTP:
-# rtp-command: "rtp player %player% world %world%"
+# Default (Vanilla): "spreadplayers 0 0 150 10000 false %player%"
+# CMI Recommendation: "cmi rt %player% %world%"
 rtp-command: "spreadplayers 0 0 150 10000 false %player%"
 
-# Whether to automatically save the player's RTP landing location as their spawnpoint
-# using the Minecraft /spawnpoint system (forced, so they don't need a bed to respawn there).
-save-spawnpoint: true
+# Whether to enable the custom spawnpoint command execution
+spawnpoint-command-enabled: true
+
+# Command to set the player's spawnpoint or home after successful RTP.
+#
+# Placeholders: %player%, %world%, %x%, %y%, %z%
+#
+# Default (Vanilla): "spawnpoint %player% %x% %y% %z%"
+# CMI Recommendation: "cmi sethome firstspawn %player% -p -l:%world%;%x%;%y%;%z% -overwrite"
+spawnpoint-command: "spawnpoint %player% %x% %y% %z%"
 
 # The amount of ticks to wait after the RTP teleport finishes before unhiding the player.
 # 20 ticks = 1 second.

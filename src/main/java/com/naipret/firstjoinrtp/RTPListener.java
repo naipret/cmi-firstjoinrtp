@@ -37,7 +37,10 @@ public class RTPListener implements Listener {
 
     // Configuration values
     private final String targetWorld;
+    private final boolean rtpCommandEnabled;
     private final String rtpCommand;
+    private final boolean spawnpointCommandEnabled;
+    private final String spawnpointCommand;
     private final boolean saveSpawnpoint;
     private final long delayAfterTp;
 
@@ -49,8 +52,13 @@ public class RTPListener implements Listener {
     public RTPListener(FirstJoinRTP plugin) {
         this.plugin = plugin;
         this.targetWorld = plugin.getConfig().getString("target-world", "world");
+        this.rtpCommandEnabled = plugin.getConfig().getBoolean("rtp-command-enabled", true);
         this.rtpCommand = plugin.getConfig().getString("rtp-command",
                 "spreadplayers 0 0 150 10000 false %player%");
+        this.spawnpointCommandEnabled =
+                plugin.getConfig().getBoolean("spawnpoint-command-enabled", true);
+        this.spawnpointCommand = plugin.getConfig().getString("spawnpoint-command",
+                "spawnpoint %player% %x% %y% %z%");
         this.saveSpawnpoint = plugin.getConfig().getBoolean("save-spawnpoint", true);
         this.delayAfterTp = plugin.getConfig().getLong("delay-after-teleport-ticks", 20L);
     }
@@ -116,6 +124,10 @@ public class RTPListener implements Listener {
      * @param player The player to prepare
      */
     private void prepareRTP(Player player) {
+        if (!rtpCommandEnabled) {
+            return;
+        }
+
         UUID uuid = player.getUniqueId();
 
         // Prevent double execution during delay or active RTP
@@ -131,9 +143,6 @@ public class RTPListener implements Listener {
             other.hidePlayer(plugin, player);
         }
 
-        String cmd =
-                rtpCommand.replace("%player%", player.getName()).replace("%world%", targetWorld);
-
         // Small delay to guarantee they are fully inserted in the world before executing RTP
         new BukkitRunnable() {
             @Override
@@ -144,7 +153,7 @@ public class RTPListener implements Listener {
                     // Only start capturing teleports now to avoid catching other plugins' initial
                     // positioning teleports
                     inRtpProcess.add(uuid);
-                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), cmd);
+                    dispatchCustomCommand(player, rtpCommand, null);
 
                     // TIMEOUT SAFEGUARD: 15 seconds (300 ticks) from execution
                     // If RTP command fails, they would otherwise be stuck invisible and
@@ -196,17 +205,31 @@ public class RTPListener implements Listener {
 
                 Location newLoc = event.getTo();
 
-                // Save spawnpoint using the native Spigot API
-                if (saveSpawnpoint) {
-                    player.setRespawnLocation(newLoc, true);
-                    plugin.getLogger()
-                            .info("RTP successful for " + player.getName() + ", spawnpoint set at: "
-                                    + newLoc.getBlockX() + ", " + newLoc.getBlockY() + ", "
-                                    + newLoc.getBlockZ() + " in world "
-                                    + newLoc.getWorld().getName());
+                // Determine whether to execute spawnpoint command, set native spawnpoint, or do
+                // nothing
+                boolean hasNewConfig = plugin.getConfig().contains("spawnpoint-command-enabled")
+                        || plugin.getConfig().contains("spawnpoint-command");
+
+                if (hasNewConfig) {
+                    if (spawnpointCommandEnabled && spawnpointCommand != null
+                            && !spawnpointCommand.trim().isEmpty()) {
+                        dispatchCustomCommand(player, spawnpointCommand, newLoc);
+                        plugin.getLogger().info("RTP successful for " + player.getName()
+                                + ", executed spawnpoint command: " + spawnpointCommand);
+                    } else {
+                        plugin.getLogger().info("RTP successful for " + player.getName()
+                                + " (spawnpoint command is disabled or empty).");
+                    }
                 } else {
-                    plugin.getLogger().info("RTP successful for " + player.getName()
-                            + " (spawnpoint saving is disabled).");
+                    // Backwards compatibility for older configs
+                    if (saveSpawnpoint) {
+                        player.setRespawnLocation(newLoc, true);
+                        plugin.getLogger().info("RTP successful for " + player.getName()
+                                + ", spawnpoint set natively.");
+                    } else {
+                        plugin.getLogger().info("RTP successful for " + player.getName()
+                                + " (native spawnpoint is disabled).");
+                    }
                 }
 
                 // Tag the player to prevent future automatic RTPs
@@ -273,6 +296,41 @@ public class RTPListener implements Listener {
         UUID uuid = event.getPlayer().getUniqueId();
         inRtpProcess.remove(uuid);
         pendingRtp.remove(uuid);
+    }
+
+    /**
+     * Replaces placeholders and executes a command from the console.
+     *
+     * @param player The target player
+     * @param rawCommand The raw command string from configuration
+     * @param loc The landing location (can be null for RTP command)
+     */
+    private void dispatchCustomCommand(Player player, String rawCommand, Location loc) {
+        if (rawCommand == null || rawCommand.trim().isEmpty()) {
+            return;
+        }
+
+        String command = rawCommand.trim();
+
+        // Strip leading slash if present
+        if (command.startsWith("/")) {
+            command = command.substring(1).trim();
+        }
+
+        // Replace placeholders
+        String worldName =
+                (loc != null && loc.getWorld() != null) ? loc.getWorld().getName() : targetWorld;
+        command = command.replace("%player%", player.getName()).replace("%world%", worldName);
+
+        if (loc != null) {
+            command = command.replace("%x%", String.valueOf(loc.getBlockX()))
+                    .replace("%y%", String.valueOf(loc.getBlockY()))
+                    .replace("%z%", String.valueOf(loc.getBlockZ()));
+            command = command.replace("%yaw%", String.valueOf(Math.round(loc.getYaw())))
+                    .replace("%pitch%", String.valueOf(Math.round(loc.getPitch())));
+        }
+
+        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
     }
 
     /**
