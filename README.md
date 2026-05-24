@@ -3,6 +3,7 @@
 FirstJoinRTP is a lightweight and robust Minecraft server plugin. It facilitates Random Teleport (RTP) for players upon their first time joining a specific world, and automatically saves their destination as their spawnpoint. This is especially useful for servers using Limbo or Lobby authentication plugins (like LibreLogin), where you only want the RTP to trigger when they actually enter the survival world.
 
 ## ✨ Features
+
 - **First Join RTP**: Triggers a customizable random teleport command only on their first time joining.
 - **Limbo/Lobby Compatible**: Waits until the player enters the configurable `target-world` before triggering.
 - **Auto-Save Spawnpoint**: Automatically sets the player's respawn location at their RTP landing spot using the Spigot/Paper API (forced, so beds are not required).
@@ -10,6 +11,7 @@ FirstJoinRTP is a lightweight and robust Minecraft server plugin. It facilitates
 - **Persistent Data**: Uses Minecraft's native `PersistentDataContainer` to track RTP completion, meaning no database configuration is required.
 
 ## ⚙️ Configuration
+
 A default `config.yml` is generated upon first startup.
 
 ```yaml
@@ -37,6 +39,7 @@ delay-after-teleport-ticks: 20
 ```
 
 ## 🚀 Installation
+
 1. Place the `FirstJoinRTP.jar` into your server's `plugins` folder.
 2. Restart your server.
 3. Adjust `plugins/FirstJoinRTP/config.yml` as needed.
@@ -45,9 +48,11 @@ delay-after-teleport-ticks: 20
 ## 🛠️ Building the Plugin
 
 To compile and package the plugin from source, you will need:
+
 - **Java Development Kit (JDK) 21** or higher.
 - **Apache Maven** installed and configured in your system path.
 - Run the following command:
+
    ```cmd
    mvn clean package
    ```
